@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonteCarloLabs &mdash; Historical Stock Simulation Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- ============================= TOP BAR ============================= -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-mark">MC</span>
+        <div class="brand-text">
+          <span class="brand-name">MonteCarloLabs</span>
+          <span class="brand-tagline">Historical Simulation Research Terminal</span>
+        </div>
+      </div>
+      <div class="topbar-status" id="datasetStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">No dataset loaded</span>
+      </div>
+    </header>
+
+    <div class="app-body">
+
+      <!-- ============================= SIDEBAR ============================= -->
+      <aside class="sidebar">
+
+        <section class="panel">
+          <h2 class="panel-title">01 &mdash; Import Data</h2>
+          <label class="dropzone" id="dropzone" for="fileInput">
+            <input type="file" id="fileInput" accept=".csv,.xls,.xlsx,.txt" hidden>
+            <span class="dropzone-icon">&#8595;</span>
+            <span class="dropzone-text">Drop file or click to browse</span>
+            <span class="dropzone-hint">.CSV &nbsp;&middot;&nbsp; .XLS &nbsp;&middot;&nbsp; .XLSX</span>
+          </label>
+          <div id="fileMeta" class="file-meta hidden"></div>
+          <div id="loadWarnings" class="warnings hidden"></div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">02 &mdash; Simulation Settings</h2>
+
+          <div class="field">
+            <label for="tradesPerSimulation">Trades per Simulation</label>
+            <input type="number" id="tradesPerSimulation" min="1" step="1" value="20">
+          </div>
+
+          <div class="field">
+            <label for="holdDays">Hold Days</label>
+            <input type="number" id="holdDays" min="1" step="1" value="10">
+          </div>
+
+          <div class="field">
+            <label for="simulationCount">Monte Carlo Simulations</label>
+            <input type="number" id="simulationCount" min="1" step="1" value="1000">
+          </div>
+
+          <div class="field">
+            <label for="buyMethod">Buy Method</label>
+            <select id="buyMethod">
+              <option value="randomOpenClose">Random price between Open and Close</option>
+              <option value="open">Open price</option>
+              <option value="close">Close price</option>
+            </select>
+          </div>
+
+          <div class="field field-checkbox">
+            <label for="allowDuplicates">Allow duplicate entry dates</label>
+            <input type="checkbox" id="allowDuplicates" checked>
+          </div>
+
+          <button id="runButton" class="btn btn-primary btn-full" disabled>Run Simulation</button>
+
+          <div id="progressWrap" class="progress-wrap hidden">
+            <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+            <span id="progressLabel" class="progress-label">0%</span>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- ============================= MAIN CONTENT ============================= -->
+      <main class="main-content">
+
+        <div id="emptyState" class="empty-state">
+          <span class="empty-state-mark">MC</span>
+          <h2>Load historical price data to begin</h2>
+          <p>Import a CSV or Excel file with Date, Open, and Close columns from the sidebar, configure your simulation settings, then run the Monte Carlo engine to evaluate historical statistical tendencies.</p>
+        </div>
+
+        <div id="resultsArea" class="results-area hidden">
+
+          <!-- KPI STRIP -->
+          <section class="kpi-strip">
+            <div class="kpi-card">
+              <span class="kpi-label">Average Return</span>
+              <span class="kpi-value" id="kpiAverage">&mdash;</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Median</span>
+              <span class="kpi-value" id="kpiMedian">&mdash;</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Std. Deviation</span>
+              <span class="kpi-value" id="kpiStdDev">&mdash;</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Minimum</span>
+              <span class="kpi-value" id="kpiMin">&mdash;</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Maximum</span>
+              <span class="kpi-value" id="kpiMax">&mdash;</span>
+            </div>
+          </section>
+
+          <section class="kpi-strip kpi-strip-secondary">
+            <div class="kpi-card kpi-card-alt">
+              <span class="kpi-label">Probability of Profit</span>
+              <span class="kpi-value" id="kpiProbProfit">&mdash;</span>
+            </div>
+            <div class="kpi-card kpi-card-alt">
+              <span class="kpi-label">Probability &gt; 5%</span>
+              <span class="kpi-value" id="kpiProb5">&mdash;</span>
+            </div>
+            <div class="kpi-card kpi-card-alt">
+              <span class="kpi-label">Probability &gt; 10%</span>
+              <span class="kpi-value" id="kpiProb10">&mdash;</span>
+            </div>
+            <div class="kpi-card kpi-card-alt">
+              <span class="kpi-label">Probability &gt; 20%</span>
+              <span class="kpi-value" id="kpiProb20">&mdash;</span>
+            </div>
+          </section>
+
+          <!-- PERCENTILES -->
+          <section class="card">
+            <h3 class="card-title">Percentiles</h3>
+            <div class="percentile-grid" id="percentileGrid"></div>
+          </section>
+
+          <!-- CHARTS -->
+          <section class="card-grid">
+            <div class="card chart-card">
+              <h3 class="card-title">Return Distribution (Histogram)</h3>
+              <div class="chart-wrap">
+                <canvas id="histogramCanvas"></canvas>
+              </div>
+            </div>
+            <div class="card chart-card">
+              <h3 class="card-title">Return Distribution (Share)</h3>
+              <div class="chart-wrap">
+                <canvas id="pieCanvas"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- SIMULATION SUMMARY TABLE -->
+          <section class="card">
+            <div class="card-header-row">
+              <h3 class="card-title">Simulation Summary</h3>
+              <span class="card-subtitle">Click a row to inspect trade details</span>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="simulationTable">
+                <thead>
+                  <tr>
+                    <th>Simulation #</th>
+                    <th>Average Return</th>
+                    <th>Wins</th>
+                    <th>Losses</th>
+                  </tr>
+                </thead>
+                <tbody id="simulationTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- TRADE DETAILS TABLE -->
+          <section class="card">
+            <div class="card-header-row">
+              <h3 class="card-title" id="tradeDetailsTitle">Trade Details</h3>
+              <span class="card-subtitle" id="tradeDetailsSubtitle">Select a simulation above</span>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="tradeTable">
+                <thead>
+                  <tr>
+                    <th>Trade #</th>
+                    <th>Entry Date</th>
+                    <th>Exit Date</th>
+                    <th>Buy</th>
+                    <th>Sell</th>
+                    <th>Return %</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody id="tradeTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- RESEARCH NOTES -->
+          <section class="card">
+            <h3 class="card-title">Research Notes</h3>
+            <textarea id="researchNotes" class="research-notes" placeholder="Record observations about this dataset, this configuration, or the statistical results here. Notes persist until the page is refreshed."></textarea>
+          </section>
+
+          <!-- REPORT -->
+          <section class="card">
+            <div class="card-header-row">
+              <h3 class="card-title">Report</h3>
+              <div class="button-row">
+                <button id="downloadHtmlBtn" class="btn btn-secondary">Save as HTML</button>
+                <button id="downloadTxtBtn" class="btn btn-secondary">Save as TXT</button>
+              </div>
+            </div>
+            <div id="reportPreview" class="report-preview"></div>
+          </section>
+
+        </div>
+
+        <div id="errorBanner" class="error-banner hidden" role="alert"></div>
+
+      </main>
+    </div>
+
+    <footer class="app-footer">
+      MonteCarloLabs evaluates historical statistical tendencies only. This is not financial advice and not a prediction of future performance.
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script src="js/utils.js"></script>
+  <script src="js/loader.js"></script>
+  <script src="js/statistics.js"></script>
+  <script src="js/simulation.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
